@@ -1,0 +1,458 @@
+Vinho Verde: Bringing Together Measurements and Reported Quality by Paul Haller
+========================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+#Load all relevant packages
+
+library(ggplot2)
+library(GGally)
+library(scales)
+library(memisc)
+library(gridExtra)
+```
+
+```{r echo=FALSE, Load_the_Data}
+#Loading the csv
+df <- read.csv("wineQualityWhites.csv")
+```
+
+# Univariate Plots Section
+
+```{r echo=FALSE, Univariate_Plots}
+#Overview of the structure (str) of the dataframe.
+str(df)
+```
+
+
+
+```{r echo=FALSE}
+#The first variable "X" is just an identifier for the sample; I will therefore not include it in the summary:
+summary(subset(df, select= c(-X)))
+```
+
+Looks like we will be looking at how quality, the only categorical variable, interacts with other (combinations of) variables, as well es interactions between variable that seem intuitively linked, e.g. free vs total sulfur dioxide or pH vs acidity levels. For most variables, the median and mean are quite close to each other, suggesting normal distributions. Let's take a look at a selection of them:
+
+```{r echo=FALSE, warnings=FALSE, message=FALSE}
+#Plotting histograms of 10 variables of interest
+
+p1 <- ggplot(data = df, aes(fixed.acidity )) +
+  geom_histogram()
+
+p2 <- ggplot(data = df, aes(volatile.acidity )) +
+  geom_histogram()
+
+p3 <- ggplot(data = df, aes(citric.acid)) +
+  geom_histogram()
+
+p4 <- ggplot(data = df, aes(residual.sugar)) +
+  geom_histogram()
+
+p5 <- ggplot(data = df, aes(free.sulfur.dioxide)) +
+  geom_histogram()
+
+p6 <- ggplot(data = df, aes(total.sulfur.dioxide)) +
+  geom_histogram()
+
+p7 <- ggplot(data = df, aes(pH)) +
+  geom_histogram()
+
+p8 <- ggplot(data = df, aes(sulphates)) +
+  geom_histogram()
+
+p9 <- ggplot(data = df, aes(alcohol)) +
+  geom_histogram()
+
+p10 <- ggplot(data = df, aes(quality)) +
+  geom_histogram()
+
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)
+```
+
+Just to get an overview, I've plotted 10 possibly interesting variables as histograms, leaving out chlorides and density. I left out the last two, as I think the analysis will for the most part rest on examining the relationship between quality and some combination of other variables. From the description that came with the dataset, it seemed unlikely that either of these two variables impact taste too much, so to simplify things, I left them out. 
+All histograms apart from residual sugar and alcohol approximate a normal distribution. most skewing right slightly. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(quality)) +
+  geom_histogram(binwidth = 1)
+```
+
+Quality ranges from 3 to 9, with the vast majority of wines being around a 5 or 6, i.e. squarely in the middle of the range (from 0-10). 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(alcohol)) +
+  geom_histogram(binwidth = .1)
+```
+
+Alcohol distribution looks fairly normal, skewed right and with perhaps a little bimodal bump at ca. 12.5?
+
+```{r echo=FALSE}
+ggplot(data = df, aes(x=log10(alcohol))) +
+  geom_histogram(binwidth = .008) 
+```
+
+Taking the log10 of alcohol makes the histogram appear a little more "normal", but at this stage does not help me understand the alcohol variable better. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(residual.sugar)) +
+  geom_histogram(binwidth = .5)
+```
+
+Residual sugar skews right very strongly, with the highest peak at about 1. 
+```{r echo=FALSE}
+ggplot(data = df, aes(x=log10(residual.sugar))) +
+  geom_histogram(binwidth = .05) 
+```
+
+Taking the log10 of residual sugar and using a bin width of 0.05 gives us what looks like a binomial distribution. So there is another cluster of values in the tail. Let's look at an even smaller bin size and see what that shows us. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(x=log10(residual.sugar))) +
+  geom_histogram(binwidth = .01) 
+```
+
+Now we can see the smaller "bump"" between 0.75 and 1.25. So this shows us in a bit more detail what is happening in the tail of the histogram.
+
+```{r echo=FALSE}
+#Creating a dataframe containing only observations where the wine quality is higher than 7 
+high.quality <- subset(df, quality>7)
+
+#Plotting both the original and the new dataframe underneath each other
+p1 <-ggplot(data = high.quality, aes(alcohol)) +
+  geom_histogram(binwidth = .1)
+
+p2 <-ggplot(data = df, aes(alcohol)) +
+  geom_histogram(binwidth = .1)
+
+grid.arrange(p2, p1)
+```
+
+Subsetting for high quality wines (8 and 9) shows they also have higher alcohol levels (lower histogram).
+```{r echo=FALSE}
+summary(df$alcohol)
+summary(high.quality$alcohol)
+```
+
+This summary confirms what the plots showed us: high quality wines tend to have high(er) alcohol levels. This is shown most clearly by the higher median and by the fact that the 1st Quartile is a lot higher for the higher quality wines.
+
+```{r echo=FALSE}
+ggplot(data = df, aes(citric.acid)) +
+  geom_histogram(binwidth=0.01)
+```
+
+Choosing a smaller binwidth lets us see a weird spike at 0.5. Let's zoom in on it.  
+
+```{r echo=FALSE}
+#Looking at a smaller section of the plot (of the cartesian coordinates), by defining which section of the x axis to display
+
+ggplot(data = df, aes(citric.acid)) +
+  geom_histogram(binwidth=0.01) +
+  coord_cartesian(xlim = c(0.2, 0.6))
+```
+
+Looks less "extreme" like this, but still noticeable. Is it just a fluke?
+```{r echo=FALSE}
+ggplot(data = high.quality, aes(citric.acid)) +
+  geom_histogram(binwidth=0.01)
+```
+
+Taking the data subset for higher quality, we see a far narrower band of citric acid levels. Does a specific range of citric acid (not too little and not too much) lead to wines tasting better? Perhaps in combination with another variable. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(fixed.acidity)) +
+  geom_histogram(binwidth=0.1)
+```
+
+Fixed acidity shows a nice normal distribution. There is no spike here coresponding to the citric acid variable, as the bulk of the measurements are above 3, whila almost all values for citric acid are below 1 g / dm^3. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(volatile.acidity)) +
+  geom_histogram(binwidth=0.01) 
+```
+
+This distribution has a slightly longer right tail than fixed acidity. Is there very slight bump at ca. 0.5? Let's zoom in.
+
+```{r echo=FALSE}
+#Looking at a smaller section of the plot (of the cartesian coordinates), by defining which section of the x axis to display
+
+ggplot(data = df, aes(volatile.acidity)) +
+  geom_histogram(binwidth=0.01) +
+  coord_cartesian(xlim = c(0.2, 0.6 ))
+```
+
+There doesn't seem to be anything very interesting there. I also noticed that it probably doesn't make sense to directly compare volatile to citric acidity, as there are simply far higher levels of volatile acidity compared to citric acidity.
+
+### What is the structure of your dataset?
+
+There are 4898 obs. of  13 variables, with the first variable just being a counter of the samples, so it can be excluded for the most part. All the other variables are quantitative apart from "quality"" which is categorical (values from 0-10).  
+
+### What is/are the main feature(s) of interest in your dataset?
+
+I would say, how quality relates to the other variables. Which chemical properties of the wines correlate in which way with quality? 
+
+### What other features in the dataset do you think will help support your \
+investigation into your feature(s) of interest?
+
+Several variables seem prima facie connected, e.g.free and total sulfur dioxide as well as the acidity variables. (However, I might be wrong, especially concerning citric acid)
+
+### Did you create any new variables from existing variables in the dataset?
+
+No. 
+
+### Of the features you investigated, were there any unusual distributions? \
+Did you perform any operations on the data to tidy, adjust, or change the form \
+of the data? If so, why did you do this?
+
+Residual sugar and alcohol were very strongly right-skewed and had a possibly binomial distribution, respectively. Citric acid has a big peak at ca. 0.5 1 g / dm^3. 
+I subsetted the data to only include the best rated wines (quality). I did this to get a first impression of what properties highly rated wines have. Preliminarily I would say that higher rated wines seem to have higher levels of alcohol. The high quality wines also seem to have a smaller range of citric acid levels.
+
+# Bivariate Plots Section
+
+```{r echo=FALSE, Bivariate_Plots}
+#Plotting a heatmap of correlation for all relevant variables, layout.exp adds a "square" to the left of heatmap so labels are not cut off
+ggcorr(subset(df, select= c(-X)), size = 3, layout.exp = 1) 
+# changed from ggpairs at suggestion of reviewer. Aesthetic adjustments via the documentation: https://briatte.github.io/ggcorr/
+```
+
+The variable of interest, the one you'd want to predict, would be quality. But there don't seem to be many strong (direct) correlations, apart from density vs. residual sugar. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(quality, alcohol)) +
+  geom_point(alpha = 0.2, position = 'jitter')
+```
+
+So from about wines with quality 7, more wines have higher alcohol contents than lower. For wines quality 5 and 6, the majority of samples have lower (below 11 and below 10) levels of alcohol. So this bears out what we saw in the matrix - that higher quality wines have a higher alcohol content. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(x=quality, y=alcohol)) +
+  geom_boxplot(aes(group=quality))
+```
+
+The same data as a boxplot: this shows at a glance how the average alcohol content of wine samples (per quality rating) increases with higher quality ratings. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(alcohol, residual.sugar)) + 
+  geom_point()
+```
+
+A general trend of lower residual sugar the more alcohol a given wines contains is visible and gets more pronounced the more alcohol a sample contains. There is also one extreme outlier with a very high amount of sugar- more than double the amount of the vast bulk of samples. 
+
+```{r echo=FALSE}
+#adding a red line of best fit to the (scatter)plot with geom_smooth
+ggplot(data = df, aes(alcohol, residual.sugar)) + 
+  geom_point(alpha = 0.2) + 
+  geom_smooth(method = "lm", color = "red")
+```
+
+Would the line of best fit change significantly if I remove that one extreme outlier?
+
+```{r echo=FALSE}
+#The same plot as above, but with data points with residual sugar values above 60 removed (which removes one outlier)
+ggplot(data = subset(df, df$residual.sugar<60), aes(alcohol, residual.sugar)) + 
+  geom_point(alpha = 0.2) + 
+  geom_smooth(method = "lm", color = "red")
+```
+
+This scatterplot and line seem to show a stronger relationship between sugar and alcohol than the last chart did- by how much did the correlation actually change?
+```{r echo=FALSE}
+#Two tests of correlation (Pearson's), one on whole dataset, one with the sugar outlier(s) removed
+cor.test(df$alcohol, df$residual.sugar)
+cor.test(subset(df, df$residual.sugar<60)$alcohol, subset(df, df$residual.sugar<60)$residual.sugar)
+```
+
+There was barely any change in the correlation. Probably this is due to the fact I only removed one value. But the resulting scatterplot shows the previously mentioned relationship a little more clearly, as it is "zoomed in" compared to the plot showing the extreme outlier. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(x=quality, y=residual.sugar)) +
+  geom_point(position = "jitter", alpha = 0.1) +
+  geom_smooth(method="lm", color = "red")
+```
+
+Comparing residual sugar and quality directly shows there is no clear ( i.e. hardly any) relationship between the two variables. I do find this surprising, as one would assume that the sweetness of a wine would affect the percieved quality in some way (negatively or positively).
+We can see though, thinking back to the histogram of residual sugar, that most samples have very low levels of residual sugar, i.e. close to 1 g / dm^3. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(x=fixed.acidity, y=pH)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = "lm", color = "red") 
+```
+
+pH and fixed acidity- why do they only have a medium correlation? pH gives oyu how basic or acidic a substance/ liquid is, I would have expected a very high correlation, but it is only ca. 0.4- why? Perhaps because the pH values of the samples are actually very close together?
+
+```{r echo=FALSE}
+#Removing acidity outliers based on above scatterplot 
+no_acidity_outliers <- subset(df, df$fixed.acidity < 10)
+```
+
+```{r echo=FALSE}
+ggplot(data = no_acidity_outliers, aes(x=fixed.acidity, y=pH)) +
+  geom_point(alpha = 0.25) +
+  geom_smooth(method = "lm", color = "red")
+```
+
+```{r echo=FALSE}
+#Adjusting the y-axis to show the entire pH scale (from 0 to 14)
+ggplot(data = no_acidity_outliers, aes(x=fixed.acidity, y=pH)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = "lm", color = "red") +
+  ylim(0, 14)
+```
+
+Showing the pH scale from zero to 14 on the y-axis shows the narrow band of pH values relative to fixed acidity... wait. How is that even possible? It means that the fixed acidity measures something different from pH!
+
+```{r echo=FALSE}
+cor.test(no_acidity_outliers$pH, no_acidity_outliers$fixed.acidity)
+```
+
+Actually reduces correlation ever so slightly.
+
+```{r echo=FALSE}
+ggplot(data = df, aes(quality, density)) +
+  geom_point(position = "jitter", alpha=0.1)
+```
+
+So density is within a pretty narrow range, except for that one extreme outlier. It is at the same quality rating (six) as the outlier for residual sugar. As sugar and density have the highest correlation, this is to be expected, we will see this clearly in the next plot.  
+We can also see that higher quality wines tend to have a lower density, i.e. the correlation is negative. 
+
+```{r echo=FALSE}
+ggplot(data = df, aes(residual.sugar, density)) +
+  geom_point(alpha=0.1)
+```
+
+This is a plot of the strongest direct relationship in the data. We can clearly see the diagonal shape the data points create, indicating a strong positive correlation.
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+
+Surprisingly, to me at least, there are no *very* strong direct relationships between quality and the quantative variables. The variable with the strongest relationship to quality is alcohol, followed by density. Alcohol and density are clearly related (cor 0.4), due I assume to the chemical properties of liquids containing alcohol. I would then have expected the correlation between density and quality to be stronger.  
+As density correlates highly with residual sugar I will be looking at how density, residual sugar and alcohol relate to quality. 
+
+### Did you observe any interesting relationships between the other features \
+(not the main feature(s) of interest)?
+
+Total sulfur dioxide and free sulfur dioxide correlate strongly, unsurprisingly. The fact that pH and acidity don't have a stronger (negative) relationship surprises me a little, as pH is just a measure of how basic or acidic a substance is. 
+
+### What was the strongest relationship you found?
+
+The highest correlation is density to residual sugar at ca. 0.8.
+
+# Multivariate plots
+```{r echo=FALSE}
+#Using factor of quality so quality is displayed by disrecete colours, as this variable is qualitative, not continuous) 
+#Dark theme added to make it easier to distinguish colours
+no_sugar_outliers <- subset(df, df$residual.sugar<60)
+ggplot(data = no_sugar_outliers, aes(x=alcohol, y=residual.sugar, colour=factor(quality))) +
+  geom_point(position = "jitter", alpha = 1) +
+  scale_colour_brewer(type = "qual", palette = "Set1") +
+  theme_dark()
+```
+
+This plot shows that the higher alcohol/ lower sugar wines *tend* to be considered higher quality. Except, there are some *very* high quality wines- between 11-13% alcohol, that have a fairly high sugar content (between 5 and 15 g / dm^3) compared to most of the good/ ok wines with high alcohol content having little sugar, below 5 g / dm^3 I'd say. Let's try swapping quality and alcohol around to see if that helps visually:
+```{r echo=FALSE}
+#specified red to black for this continuous scale as it makes it easier to tell high from low levels of alcohol (imho)
+no_sugar_outliers <- subset(df, df$residual.sugar<60)
+ggplot(data = no_sugar_outliers, aes(x=quality, y=residual.sugar, colour=alcohol)) +
+  geom_point(position = "jitter", alpha = 0.2) +
+  scale_colour_gradient(low = "red", high = "black")
+  
+```
+
+OK, so here we can see better that the wines with lower alcohol content (redder) tend to have more residual sugar. This can be seen most clearly be looking at higher quality wines (>=7) that tend to have higher alcohol contents but if they have high residual sugar, they then tend to have lower levels of alcohol. As quality increases, residual sugar goes down, but as there are fewer samples of high quality wines, it's harder to say how siginficant this pattern is. Remembering the histogram of residual sugar again: most values are around 1 g / dm^3, we can see that in the columns too, most values (overplotted) are at the bottom, i.e. around 1).
+
+```{r echo=FALSE}
+#Using factor of quality so quality is displayed by disrecete colours, as this variable is qualitative, not continuous) 
+#Dark theme added to make it easier to distinguish colours
+ggplot(data = no_sugar_outliers, aes(x=alcohol, y=density)) +
+  geom_point(aes(colour = factor(quality)), alpha=0.4) +
+  scale_colour_brewer(type = "qual", palette = "Set1") +
+  theme_dark()
+```
+
+Here we can see quite nicely the inverse relationship between density and alcohol, and to a lesser extent quality (The orange and yellow data points (quality 7 and 8) are clustered to the bottom left of the plot). 
+
+```{r echo=FALSE}
+#Using factor of quality so quality is displayed by disrecete colours, as this variable is qualitative, not continuous) 
+#Dark theme added to make it easier to distinguish colours
+ggplot(data = no_sugar_outliers, aes(x=alcohol, y=density, size = residual.sugar)) +
+  geom_point(aes(colour = factor(quality)), alpha=0.3) +
+  scale_colour_brewer(type = "qual", palette = "Set1")+
+  theme_dark()
+```
+
+Here I have added an additional dimension (residual sugar) to the previous chart: Larger plot points indicate higher levels of residual sugar. I am trying to visualise how residual sugar interacts with the other plotted variables. I hope I am not reading to much into this visualisation but I would say that as density decreases and alcohol levels increase, that plot points also decrease (except for the outliers). I would also provisionally say that there seems to be a sweet spot for quality at ca 12.5% alcohol, with generally lower residual sugar. 
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+
+I think I was trying to show that alcohol, density and sugar all work together in explaining quality. But I am not so sure this is clearly borne out by what I have explored so far. If I were to build a model, I would be interested to see if residual sugar (in addition to density and alcohol) helps predict wine quality or not.  
+
+### Were there any interesting or surprising interactions between features?
+
+Due to the clear relationships between sugar and density and density and alcohol, I was assuming that bringing these variables together would show far more clearly or strikingly the relationship between all 3 of these variables and ultimately, quality. 
+
+# Final Plots and Summary
+
+### Plot One
+```{r echo=FALSE, Plot_One}
+ggplot(data = df, aes(x=log10(residual.sugar))) +
+  geom_histogram(binwidth = .01) +
+  ggtitle("Residual Sugar on a Logarithmic Scale") +
+  xlab("residual sugar in g / dm^3") +
+  ylab("number of samples")
+```
+
+
+### Description One
+
+On a logarithmic scale, we can see a slightly bimodal histogram. This shows that the values in the tail are mainly just below or just above 1, giving a bit more detail about the distribution of the values in teh tail of this histogram. 
+
+### Plot Two
+```{r echo=FALSE, Plot_Two}
+
+ggplot(data = no_sugar_outliers, aes(residual.sugar, density)) +
+  geom_point(alpha=0.2, colour = "red") +
+  theme_dark() +
+  ggtitle("Strongest Positive Correlation: Density by Residual Sugar") +
+  labs(x="residual sugar in g / dm^3", y= "density in g / cm^3")
+```
+
+
+### Description Two
+
+The plot points of these two variable line up very nicely, approximating a diagonal line from bottom left to top right. As there are far more samples around 1 g/dm^3 for residual sugar, the data "thins out" from left to right. A few extreme outliers are also visible, but the corellation of high residual sugar resulting in high density holds for them too. 
+
+### Plot Three
+```{r echo=FALSE, Plot_Three}
+ggplot(data = no_sugar_outliers, aes(x=alcohol, y=density, size = residual.sugar)) +
+  geom_point(aes(colour = factor(quality)), alpha=0.3) +
+  scale_colour_brewer(type = "qual", palette = "Set1") +
+  theme_dark() +
+  ggtitle("Density by Alcohol, Residual Sugar and Quality") +
+  labs(x="alcohol in percent by volume", y= "density in g / cm^3", colour = "Quality", size = "Residual Sugar (g/dm^3)")
+```
+
+### Description Three
+
+This scatterplot shows the relationship of three quantative variables to the single qualitative variable, i.e. quality. As density decreases and alcohol increases, quality tends to increase too. The relationship between sugar and quality is quite weak, but residual sugar is clearly linked to density and to a lesser extent alcohol also.
+
+
+------
+
+# Reflection
+
+Considering that these samples are all of a "natural" product, wine, I expected the distribution of most of the measured variables to be normal. Alcohol and residual sugar did not fit this picture very well, so I thought they might be interesting variables to explore. I also intuitively assumed that the sweetness and alcohol content of wine would reflect on its percieved quality.
+I was surprised that there were so few strong correlations, I expected the different chemical properties of the wines to be more closely linked, for some reason. The clearest one here was density and residual sugar. 
+And since density and alcohol are correlated, I somehow also assumed that in combination they would show a clearer picture. 
+I found this tricky to show with these scatterplots. As I mentioned in the analysis on the multivariate plots, I believe modelling these relationships might improve the understanding of these relationships. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+
